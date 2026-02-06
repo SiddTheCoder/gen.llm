@@ -87,6 +87,26 @@ curl -N -X POST "http://localhost:8000/api/v1/llm/reasoning/chat" \
          }'
 ```
 
+### 3. Python Client Example
+Use the included `client_example.py` for a robust implementation effectively demonstrating how to consume the streaming API in your Python applications.
+
+```python
+import requests
+import json
+
+response = requests.post(
+    "http://localhost:8000/api/v1/llm/reasoning/chat",
+    json={"messages": [{"role": "user", "content": "Hello"}], "stream": True},
+    stream=True
+)
+
+for line in response.iter_lines():
+    if line:
+        decoded_line = line.decode('utf-8')
+        if decoded_line.startswith('data: '):
+            print(json.loads(decoded_line[6:]))
+```
+
 ## How It Works
 
 1.  **Initialization**: `ModelManager` checks `nvidia-smi` and `wmic`.

@@ -7,8 +7,11 @@ Endpoints:
     POST /reasoning/chat - Chat with the reasoning model
 """
 
+from typing import Union, cast, Iterator
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import json
 
 from app.api.v1.llm.schemas import (
@@ -74,7 +77,7 @@ def get_service(request: Request) -> InferenceService:
         500: {"description": "Inference error"}
     }
 )
-async def chat(request: Request, body: ChatRequest) -> ChatResponse:
+async def chat(request: Request, body: ChatRequest) -> Union[ChatResponse, StreamingResponse]:
     """
     Chat endpoint for LLM reasoning.
     
@@ -88,28 +91,41 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         messages = [msg.model_dump() for msg in body.messages]
         
         if body.stream:
-            from fastapi.responses import StreamingResponse
+            # Get the synchronous generator from the service
+            sync_generator = cast(Iterator[str], service.chat(
+                messages=messages,
+                max_tokens=body.max_tokens,
+                temperature=body.temperature,
+                stream=True
+            ))
             
             async def event_generator():
-                for chunk in service.chat(
-                    messages=messages,
-                    max_tokens=body.max_tokens,
-                    temperature=body.temperature,
-                    stream=True
-                ):
+                # Use run_in_executor to iterate over sync generator without blocking
+                loop = asyncio.get_event_loop()
+                
+                def get_next_chunk():
+                    try:
+                        return next(sync_generator)
+                    except StopIteration:
+                        return None
+                
+                while True:
+                    chunk = await loop.run_in_executor(None, get_next_chunk)
+                    if chunk is None:
+                        break
                     # Yield SSE format
                     yield f"data: {json.dumps({'response': chunk, 'model': settings.model_name})}\n\n"
                 yield "data: [DONE]\n\n"
 
             return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-        # Non-streaming
-        response_text = service.chat(
+        # Non-streaming - cast to str since stream=False returns str
+        response_text = cast(str, service.chat(
             messages=messages,
             max_tokens=body.max_tokens,
             temperature=body.temperature,
             stream=False
-        )
+        ))
         
         return ChatResponse(
             response=response_text,

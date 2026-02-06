@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Server Configuration
     # ---------------------
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 9001
     debug: bool = False
     
     # ---------------------
