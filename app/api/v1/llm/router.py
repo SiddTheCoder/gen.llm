@@ -9,6 +9,7 @@ Endpoints:
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+import json
 
 from app.api.v1.llm.schemas import (
     ChatRequest,
@@ -86,17 +87,34 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         # Convert Pydantic models to dicts for service
         messages = [msg.model_dump() for msg in body.messages]
         
-        # Run inference
+        if body.stream:
+            from fastapi.responses import StreamingResponse
+            
+            async def event_generator():
+                for chunk in service.chat(
+                    messages=messages,
+                    max_tokens=body.max_tokens,
+                    temperature=body.temperature,
+                    stream=True
+                ):
+                    # Yield SSE format
+                    yield f"data: {json.dumps({'response': chunk, 'model': settings.model_name})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+        # Non-streaming
         response_text = service.chat(
             messages=messages,
             max_tokens=body.max_tokens,
-            temperature=body.temperature
+            temperature=body.temperature,
+            stream=False
         )
         
         return ChatResponse(
             response=response_text,
             model=settings.model_name,
-            usage=None  # Could add token counting later
+            usage=None
         )
         
     except RuntimeError as e:

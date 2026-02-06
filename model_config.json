@@ -14,6 +14,59 @@
         "size_gb": 6.25,
         "quantization": "q6_k",
         "description": "Single file, best quality for GPU"
+      },
+      "vulkan": {
+        "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q3_k_m.gguf",
+        "filename": "qwen2.5-7b-instruct-q3_k_m.gguf",
+        "size_gb": 3.81,
+        "quantization": "q3_k_m",
+        "description": "Single file, good for CPU/Vulkan (reuse)"
+      }
+    },
+    "qwen2.5-1.5b": {
+      "cpu": {
+        "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "size_gb": 0.98,
+        "quantization": "q4_k_m",
+        "description": "Tiny, ultra-fast for CPU (1GB)"
+      },
+      "gpu": {
+        "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q8_0.gguf",
+        "filename": "qwen2.5-1.5b-instruct-q8_0.gguf",
+        "size_gb": 1.6,
+        "quantization": "q8_0",
+        "description": "Tiny, fast, high precision"
+      },
+      "vulkan": {
+         "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+         "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+         "size_gb": 0.98,
+         "quantization": "q4_k_m",
+         "description": "Tiny, ultra-fast (Vulkan)"
+      }
+    },
+    "llama-3.2-3b": {
+      "cpu": {
+        "url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "size_gb": 2.02,
+        "quantization": "Q4_K_M",
+        "description": "Balanced speed/quality (3B params)"
+      },
+      "gpu": {
+        "url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q6_K.gguf",
+        "filename": "Llama-3.2-3B-Instruct-Q6_K.gguf",
+        "size_gb": 2.64,
+        "quantization": "Q6_K",
+        "description": "High quality 3B model"
+      },
+      "vulkan": {
+        "url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "size_gb": 2.02,
+        "quantization": "Q4_K_M",
+        "description": "Balanced speed/quality (Vulkan)"
       }
     }
   },

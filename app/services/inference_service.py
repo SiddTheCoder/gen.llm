@@ -59,6 +59,11 @@ class InferenceService:
                 "url": "https://github.com/ggml-org/llama.cpp/releases/download/b7664/llama-b7664-bin-win-cuda-cu12.2.0-x64.zip",
                 "executable": "llama-server.exe",
                 "size_mb": 450
+            },
+            "vulkan": {
+                "url": "https://github.com/ggml-org/llama.cpp/releases/download/b7664/llama-b7664-bin-win-vulkan-x64.zip",
+                "executable": "llama-server.exe",
+                "size_mb": 40
             }
         },
         "Darwin": {  # macOS
@@ -79,6 +84,11 @@ class InferenceService:
                 "url": "https://github.com/ggml-org/llama.cpp/releases/download/b7664/llama-b7664-bin-ubuntu-x64-cuda.tar.gz",
                 "executable": "llama-server",
                 "size_mb": 400
+            },
+            "vulkan": {
+                "url": "https://github.com/ggml-org/llama.cpp/releases/download/b7664/llama-b7664-bin-ubuntu-x64.tar.gz", # Usually packaged in main or separate
+                "executable": "llama-server",
+                "size_mb": 35
             }
         }
     }
@@ -115,7 +125,12 @@ class InferenceService:
         os_releases = self.LLAMA_CPP_RELEASES.get(self.system, {})
         release = os_releases.get(self.device_type)
         if release is None:
-            release = os_releases.get('cpu')
+            # Fallbacks
+            if self.device_type == 'vulkan' and self.system == 'Linux':
+                 # Linux binaries typically include checking or we map to cpu if missing explicit vulkan build
+                 release = os_releases.get('cpu')
+            else:
+                 release = os_releases.get('cpu')
         
         if release is None:
             raise NotImplementedError(
@@ -135,7 +150,10 @@ class InferenceService:
         url = release_info['url']
         is_zip = url.endswith('.zip')
         ext = '.zip' if is_zip else '.tar.gz'
-        archive_path = binaries_dir / f"llama-{self.LLAMA_CPP_VERSION}{ext}"
+        
+        # Unique name for vulkan vs cpu to prevent overwrites if switching
+        variant = f"-{self.device_type}" if self.device_type != 'cpu' else ""
+        archive_path = binaries_dir / f"llama-{self.LLAMA_CPP_VERSION}{variant}{ext}"
         
         print(f"⬇️  Downloading from GitHub releases...")
         response = requests.get(url, stream=True)
@@ -235,13 +253,20 @@ class InferenceService:
         """Start the llama-server background process."""
         print("⏳ Starting llama-server process...")
         
+        # Determine GPU layers based on device
+        n_gpu_layers = "0"
+        if self.device_type in ["gpu", "vulkan"]:
+            n_gpu_layers = "99"
+            
+        print(f"🔧 Device: {self.device_type.upper()} (GPU Layers: {n_gpu_layers})")
+        
         cmd = [
             str(self.server_path),
             "-m", str(self.model_path),
             "--host", self.SERVER_HOST,
             "--port", str(self.SERVER_PORT),
             "-c", "4096",
-            "--n-gpu-layers", "99" if self.device_type == "gpu" else "0"
+            "--n-gpu-layers", n_gpu_layers
         ]
         
         # Start detached process
@@ -305,8 +330,9 @@ class InferenceService:
         prompt: str,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        system_prompt: Optional[str] = None
-    ) -> str:
+        system_prompt: Optional[str] = None,
+        stream: bool = False
+    ):
         """Generate response via HTTP API."""
         if not self._is_ready:
             raise RuntimeError("Call setup() first!")
@@ -317,26 +343,48 @@ class InferenceService:
             "prompt": full_prompt,
             "n_predict": max_tokens or settings.max_tokens,
             "temperature": temperature or settings.temperature,
-            "stop": ["User:", "Assistant:"] # Basic stop sequences
+            "stop": ["User:", "Assistant:"], # Basic stop sequences
+            "stream": stream
         }
         
         try:
             response = requests.post(
                 f"http://{self.SERVER_HOST}:{self.SERVER_PORT}/completion",
-                json=payload
+                json=payload,
+                stream=stream
             )
             response.raise_for_status()
-            return response.json().get('content', '').strip()
+            
+            if stream:
+                return self._stream_response(response)
+            else:
+                return response.json().get('content', '').strip()
         except Exception as e:
             print(f"❌ Inference error: {e}")
             raise RuntimeError(f"Inference failed: {e}")
+
+    def _stream_response(self, response):
+        """Yield streaming chunks from server response."""
+        for line in response.iter_lines():
+            if line:
+                decoded_line = line.decode('utf-8')
+                if decoded_line.startswith('data: '):
+                    json_str = decoded_line[6:] # Skip "data: "
+                    try:
+                        data = json.loads(json_str)
+                        content = data.get('content', '')
+                        if content:
+                            yield content
+                    except json.JSONDecodeError:
+                        pass
 
     def chat(
         self,
         messages: List[Dict[str, str]],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
-    ) -> str:
+        temperature: Optional[float] = None,
+        stream: bool = False
+    ):
         """Chat inference via HTTP API."""
         # Convert messages to raw prompt for simple completion endpoint
         # Or use /v1/chat/completions if using valid OAI format
@@ -354,7 +402,7 @@ class InferenceService:
                 prompt_parts.append(f"Assistant: {content}")
         
         prompt = "\n".join(prompt_parts) + "\nAssistant:"
-        return self.generate(prompt, max_tokens, temperature)
+        return self.generate(prompt, max_tokens, temperature, stream=stream)
 
     @property
     def is_ready(self) -> bool:

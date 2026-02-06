@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # ---------------------
     # Model Configuration  
     # ---------------------
-    model_name: str = "qwen2.5-7b"  # Model identifier from config
+    model_name: str = "qwen2.5-1.5b"  # Model identifier from config
     max_tokens: int = 512           # Default max tokens for generation
     temperature: float = 0.7        # Default sampling temperature
     

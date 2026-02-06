@@ -56,6 +56,10 @@ class ChatRequest(BaseModel):
         le=2.0,
         description="Sampling temperature (higher = more random)"
     )
+    stream: bool = Field(
+        default=False,
+        description="Whether to stream the response"
+    )
     
     class Config:
         json_schema_extra = {

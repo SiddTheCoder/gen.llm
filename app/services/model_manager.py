@@ -109,8 +109,25 @@ class ModelManager:
                 return 'gpu'
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+            
+        # Check for AMD/Intel GPUs using wmic (Windows)
+        try:
+            cmd = "wmic path win32_VideoController get name"
+            result = subprocess.run(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                text=True,
+                shell=True
+            )
+            output = result.stdout.lower()
+            if "amd" in output or "radeon" in output or "intel" in output:
+                 print(f"✅ Vulkan-compatible GPU detected: {output.strip().splitlines()[-1]}")
+                 return 'vulkan'
+        except Exception as e:
+            print(f"⚠️ GPU detection failed: {e}")
         
-        print("💻 CPU mode (no NVIDIA GPU found)")
+        print("💻 CPU mode (no NVIDIA/AMD/Intel GPU detected)")
         return 'cpu'
 
     def _download_file(self, url: str, destination: Path) -> None:
@@ -163,6 +180,11 @@ class ModelManager:
         if model_name not in self.config.get('models', {}):
             raise ValueError(f"Model '{model_name}' not found in config")
         
+        # Fallback to tiny model on CPU for performance
+        if self.device_type == 'cpu' and model_name == "qwen2.5-7b":
+            print("⚠️  CPU detected: Switching to qwen2.5-1.5b for better performance")
+            model_name = "qwen2.5-1.5b"
+
         model_config = self.config['models'][model_name][self.device_type]
         model_path = self.models_dir / model_config['filename']
         
